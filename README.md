@@ -25,8 +25,14 @@ https://us-east-2.console.aws.amazon.com/lambda/home?region=us-east-2#/applicati
 
   ----------------------------------------------------------------------
 
-  O que faltou fazer : 
+O que faltou fazer : 
   
   - Limpar os códigos antigos das funções/scripts que usei de exemplo
   - Definir melhor os outputs para facilitar acessar os recursos
+
+O que eu queria ter feito a mais:
+
+  - criar mais três filas (uma para casos aprovados, outra para casos rejeitados e outra para decisão manual) a idéia era que esse motor de decisão poderiam para outro motores de ação, através das filas
+    
+  - criar, na tabela de créditos, um campo, que reservaria o crédito, no momento da decisão, sendo que o crédito realmente utilizado s´seria marcado quando o motor da fila de empréstimo fizesse, de fato o empréstimo (fora do escopo desse teste)
 
