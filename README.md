@@ -1,4 +1,5 @@
 treinamenotoaws
+
 A aplicação simula um motor de regras de decisão de aprovação de crédito. Devido ao fato de eu ter que ficar com o braço direito imobilizado nos próximos dias, vou precisar entregar a tarefa no estado em que está.
 
 Como testar:
