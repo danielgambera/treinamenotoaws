@@ -1,0 +1,103 @@
+{
+    "Comment": "Uma máquina de estado que simula a análise de solicitação de empréstimos",
+    "StartAt": "Lê Fila de Solicitação de Empréstimo",
+    "States": {
+        "Lê Fila de Solicitação de Empréstimo": {
+            "Type": "Task",
+            "Resource": "${LefilaSolicitacaoEmprestimoFunctionArn}",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 15,
+                    "MaxAttempts": 5,
+                    "BackoffRate": 1.5
+                }
+            ],
+            "Next": "Emprestar?"
+        },
+        "Emprestar?": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.creditoAprovado",
+                    "NumericGreaterThanEqualsPath": "$.creditoSolicitado",
+                    "Next": "Conceder Crédito"
+                }
+            ],
+            "Default": "Negar Credito"
+        },
+        "Negar Credito": {
+            "Type": "Task",
+            "Resource": "${NegarCreditoFunctionArn}",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 1
+                }
+            ],
+            "Next": "Record Transaction"
+        },
+        "Conceder Crédito": {
+            "Type": "Task",
+            "Resource": "${ConcederCreditoFunctionArn}",
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 1
+                }
+            ],
+            "Next": "Record Transaction"
+        },
+        "Record Transaction": {
+            "Type": "Task",
+            "Resource": "${DDBPutItem}",
+            "Parameters": {
+                "TableName": "${DDBTable}",
+                "Item": {
+                    "Id": {
+                        "S.$": "$.id"
+                    },
+                    "IdPessoa": {
+                        "S.$": "$.idPessoa"
+                    },
+                    "TipoOperacao": {
+                        "S.$": "$.tipoOperacao"
+                    },
+                    "CreditoDisponivel": {
+                        "N.$": "$.creditoDisponivel"
+                    },
+                    "CreditoSolicitado": {
+                        "N.$": "$.creditoSolicitado"
+                    },
+                    "CreditoConcedido": {
+                        "N.$": "$.creditoConcedido"
+                    },
+                    "Timestamp": {
+                        "S.$": "$.timestamp"
+                    }
+                }
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "States.TaskFailed"
+                    ],
+                    "IntervalSeconds": 20,
+                    "MaxAttempts": 5,
+                    "BackoffRate": 10
+                }
+            ],
+            "End": true
+        }
+    }
+}

@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  MeuTeste
+
+  Teste de Workflow
+
+Resources:
+  Workflow:
+    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Properties:
+      DefinitionUri: statemachine/stock_trader.asl.json
+      DefinitionSubstitutions:
+        LefilaSolicitacaoEmprestimoFunctionArn: !GetAtt LefilaSolicitacaoEmprestimoFunction.Arn
+        ConcederCreditoFunctionArn: !GetAtt ConcederCreditoFunction.Arn
+        NegarCreditoFunctionArn: !GetAtt NegarCreditoFunction.Arn
+        DDBPutItem: !Sub arn:${AWS::Partition}:states:::dynamodb:putItem
+        DDBTable: !Ref TransactionTable
+      Events:
+        HourlyTradingSchedule:
+          Type: Schedule 
+          Properties:
+            Description: Programado para rodar em intervalos
+            Enabled: False # This schedule is disabled by default to avoid incurring charges.
+            Schedule: "rate(1 hour)"
+      Policies: # Find out more about SAM policy templates: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-policy-templates.html
+        - LambdaInvokePolicy:
+            FunctionName: !Ref LefilaSolicitacaoEmprestimoFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ConcederCreditoFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NegarCreditoFunction
+        - DynamoDBWritePolicy:
+            TableName: !Ref TransactionTable
+
+  LefilaSolicitacaoEmprestimoFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html
+    Properties:
+      CodeUri: functions/lefilasolicitacaoemprestimo/
+      Handler: app.lambdaHandler
+      Role: !GetAtt LefilaSolicitacaoEmprestimoExecutionRole.Arn
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          QUEUE_URL: !GetAtt FilaSolicitacaoEmprestimo.QueueUrl
+          TABELA_CREDITO: !Ref TabelaCredito
+  
+  LefilaSolicitacaoEmprestimoExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaSQSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - dynamodb:GetItem
+                Resource:
+                  - !GetAtt FilaSolicitacaoEmprestimo.Arn
+                  - !GetAtt TabelaCredito.Arn
+
+  ConcederCreditoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/concedercredito/
+      Handler: app.lambdaHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+
+  NegarCreditoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/negarcredito/
+      Handler: app.lambdaHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+
+  PopularCredito:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Inclui os créditos aleatórios pré-aprovados para os clientes.
+      CodeUri: functions/popularcredito/
+      Handler: app.lambdaHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TabelaCredito
+      Environment:
+        Variables:
+          TABELA_CREDITO: !Ref TabelaCredito
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /popularbase
+            Method: GET
+
+  PopularFilaSolicitacaoEmprestimo:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Inclui as solicitações aleatórias de empréstimos para os clientes.
+      CodeUri: functions/popularfilasolicitacaoemprestimo/
+      Handler: app.lambdaHandler
+      Role: !GetAtt PopularFilaSolicitacaoEmprestimoExecutionRole.Arn
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Policies:
+      Environment:
+        Variables:
+          QUEUE_URL: !GetAtt FilaSolicitacaoEmprestimo.QueueUrl
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /PopularFila
+            Method: GET
+
+  PopularFilaSolicitacaoEmprestimoExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaSQSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !GetAtt FilaSolicitacaoEmprestimo.Arn
+
+  TransactionTable:
+    Type: AWS::Serverless::SimpleTable # More info about SimpleTable Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-simpletable.html
+    Properties:
+      PrimaryKey:
+        Name: Id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+        
+  TabelaCredito:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+
+  FilaSolicitacaoEmprestimo:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: filaSolicitacaoEmprestimo
+
+Outputs:
+  # WorkflowHourlyTradingSchedule is an implicit Schedule event rule created out of Events key under Serverless::StateMachine
+  # Find out more about other implicit resources you can reference within SAM
+  # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-generated-resources.html
+  WorkflowArn:
+    Description: "Workflow"
+    Value: !Ref Workflow
+  WorkflowRole:
+    Description: "IAM Role created for Stock Trading state machine based on the specified SAM Policy Templates"
+    Value: !GetAtt WorkflowRole.Arn
+  FilaSolicitacaoEmprestimo:
+    Description: "URL da fila SQS"
+    Value: !GetAtt FilaSolicitacaoEmprestimo.QueueUrl
+  FilaSolicitacaoEmprestimoArn:
+    Description: "ARN da fila SQS"
+    Value: !GetAtt FilaSolicitacaoEmprestimo.Arn
