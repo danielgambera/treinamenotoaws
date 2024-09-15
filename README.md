@@ -9,7 +9,18 @@ https://us-east-2.console.aws.amazon.com/lambda/home?region=us-east-2#/applicati
 
 1 - Na API Gateway, entre na API MeuTeste
 
-  1a - Rode, através de um teste sem parâmetros, o endpoint popularbase (GET) - essa função irá incluir 100 pessoa, com créditos aleatórios entre 0 e 100.000
+  1a - Rode, através de um teste sem parâmetros, o endpoint popularbase (GET) - essa função irá incluir 100 pessoa, com créditos aleatórios entre 0 e 100.000 na tabela TabelaCredito.
   
-  2b - Rode, através de um teste sem parâmetros, o endpoint popularfila (GET) - essa função irá alimentar a fila SQS filaSolicitacaoEmprestimo com 100 solicitações de empréstimo
+  2b - Rode, através de um teste sem parâmetros, o endpoint popularfila (GET) - essa função irá alimentar a fila SQS filaSolicitacaoEmprestimo com 100 solicitações de empréstimo.
+
+2 - Na página de Step Functions entre na chamada Workflow, o fluxo será:
+
+  2a - Ler uma solicitação de emprestimo (na fila filaSolicitacaoEmprestimo), encontrar o credito pre-aprovado para a pessoa na tabela TabelaCredito. Passar essas informações para a decisão.
+  
+  2b - Se valor solicitado <= creditoPreAprovado - creditoUtilizado - Aprovar crédito
+
+  2c - Se não - Negar Crédito
+
+  2d - Gravar o log de ações na tabela 
+  
 
