@@ -21,6 +21,12 @@ https://us-east-2.console.aws.amazon.com/lambda/home?region=us-east-2#/applicati
 
   2c - Se não - Negar Crédito
 
-  2d - Gravar o log de ações na tabela 
+  2d - Gravar o log de ações na tabela TransactionTable
+
+  ----------------------------------------------------------------------
+
+  O que faltou fazer : 
   
+  - Limpar os códigos antigos das funções/scripts que usei de exemplo
+  - Definir melhor os outputs para facilitar acessar os recursos
 
